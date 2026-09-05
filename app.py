@@ -15,6 +15,10 @@ CACHE = {}
 def index():
     return render_template('index.html')
 
+@app.route('/favicon.ico')
+def favicon():
+    return send_file('static/favicon.svg', mimetype='image/svg+xml')
+
 @app.route('/api/convert', methods=['POST'])
 def convert():
     file = request.files['image']
@@ -23,14 +27,22 @@ def convert():
     isolate_subject = request.form.get('isolate_subject', 'true').lower() == 'true'
     
     img_bytes = file.read()
-    glb_bytes, zip_bytes, depth_map, category, strategy, model_label = converter.convert(
-        img_bytes, depth_scale, resolution, isolate_subject
-    )
+    try:
+        glb_bytes, zip_bytes, depth_map, category, strategy, model_label = converter.convert(
+            img_bytes, depth_scale, resolution, isolate_subject
+        )
+    except Exception as e:
+        error_msg = str(e)
+        if "credit" in error_msg.lower():
+            error_msg = "Tripo3D API out of credits. Please add credits to your Tripo3D account."
+        return jsonify({
+            'status': 'error',
+            'message': error_msg
+        }), 400
 
     CACHE['model.glb'] = glb_bytes
     CACHE['model.zip'] = zip_bytes
 
-    # Depth map preview as base64 png
     _, depth_encoded = cv2.imencode('.png', (depth_map * 255).astype('uint8'))
     depth_b64 = base64.b64encode(depth_encoded).decode('utf-8')
 

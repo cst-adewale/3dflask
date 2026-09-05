@@ -1,12 +1,7 @@
 flask
 gunicorn
-torch
-torchvision
-transformers
+requests
 numpy
 opencv-python-headless
-trimesh
 pillow
-scipy
-onnxruntime
-rembg[cpu]
+python-dotenv
