@@ -85,7 +85,7 @@ class ImageTo3DConverter:
 
         headers = {"Authorization": f"Bearer {TRIPO_API_KEY}"}
 
-        print("🚀 Sending image to Tripo3D Generative AI API...")
+        print("[*] Sending image to Tripo3D Generative AI API...")
         # Step 1: Upload image file to Tripo3D storage
         upload_resp = requests.post(
             f"{TRIPO_API_URL}/upload",
@@ -214,7 +214,7 @@ class ImageTo3DConverter:
         import tempfile
         from gradio_client import Client, handle_file
 
-        print("🚀 Sending image to Wonder3D AI Engine...")
+        print("[*] Sending image to Wonder3D AI Engine...")
         with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
             tmp.write(image_bytes)
             tmp_path = tmp.name
@@ -324,7 +324,7 @@ class ImageTo3DConverter:
                 used_engine = "Wonder3D AI Engine"
                 strategy_label = "Wonder3D Multi-View Mesh"
             except Exception as err:
-                print(f"⚠️ Wonder3D AI Engine note ({err}). Using Free Local Engine.")
+                print(f"[!] Wonder3D AI Engine note ({err}). Using Free Local Engine.")
                 glb_bytes = self.generate_local_3d(image_bytes, depth_scale, res)
                 used_engine = "Wonder3D (Local Fallback)"
                 strategy_label = "Local Heightmap Extrusion"
@@ -335,7 +335,7 @@ class ImageTo3DConverter:
                     used_engine = "Tripo3D Cloud AI"
                     strategy_label = "Generative 3D (Tripo3D)"
                 except Exception as err:
-                    print(f"⚠️ Tripo3D unavailable ({err}). Falling back to Free Local Engine.")
+                    print(f"[!] Tripo3D unavailable ({err}). Falling back to Free Local Engine.")
                     glb_bytes = self.generate_local_3d(image_bytes, depth_scale, res)
                     used_engine = "Tripo3D (Local Fallback)"
                     strategy_label = "Local Heightmap Extrusion"
