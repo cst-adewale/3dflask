@@ -25,16 +25,15 @@ def convert():
     depth_scale = float(request.form.get('depth_scale', 0.25))
     resolution = int(request.form.get('resolution', 256))
     isolate_subject = request.form.get('isolate_subject', 'true').lower() == 'true'
+    engine = request.form.get('engine', 'auto')
     
     img_bytes = file.read()
     try:
         glb_bytes, zip_bytes, depth_map, category, strategy, model_label = converter.convert(
-            img_bytes, depth_scale, resolution, isolate_subject
+            img_bytes, depth_scale, resolution, isolate_subject, engine
         )
     except Exception as e:
         error_msg = str(e)
-        if "credit" in error_msg.lower():
-            error_msg = "Tripo3D API out of credits. Please add credits to your Tripo3D account."
         return jsonify({
             'status': 'error',
             'message': error_msg
@@ -53,6 +52,7 @@ def convert():
         'zip_url': '/api/download/model.zip',
         'category': category,
         'strategy': strategy,
+        'model_label': model_label
     })
 
 @app.route('/api/download/<filename>')
@@ -70,5 +70,5 @@ def download(filename):
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
-    print(f"🚀 Server running instantly on http://localhost:{port}")
+    print(f"[*] Server running instantly on http://localhost:{port}")
     app.run(host='0.0.0.0', port=port, debug=False)

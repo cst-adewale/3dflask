@@ -9,6 +9,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
     <link rel="stylesheet" href="/static/style.css" />
 </head>
 
@@ -31,8 +32,9 @@
             <div class="nav-right">
                 <a href="#about">About</a>
                 <button class="nav-button" type="button"
-                    onclick="document.querySelector('#workspace').scrollIntoView({ behavior: 'smooth' })">Start creating
-                    ↗</button>
+                    onclick="document.querySelector('#workspace').scrollIntoView({ behavior: 'smooth' })">
+                    Start creating <i data-lucide="arrow-up-right" class="btn-icon"></i>
+                </button>
             </div>
         </nav>
 
@@ -42,7 +44,7 @@
             <h1>Make images<br /><em>dimensional.</em></h1>
             <p class="hero-copy">Turn any 2D photo into an interactive 3D model with automatic object reconstruction,
                 clean isolation, and instant 3D export.</p>
-            <a class="hero-button" href="#workspace">Try the converter <span>→</span></a>
+            <a class="hero-button" href="#workspace">Try the converter <i data-lucide="arrow-right" class="btn-icon"></i></a>
         </header>
 
         <section class="feature-strip" aria-label="Product features">
@@ -62,9 +64,8 @@
                 <p>Isolates the subject automatically to create a clean studio mesh.</p>
                 <span class="feature-icon" aria-hidden="true">
                     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3L12 3z"/>
-                        <circle cx="4.5" cy="4.5" r="1.5" fill="currentColor"/>
-                        <circle cx="19.5" cy="19.5" r="1.5" fill="currentColor"/>
+                        <path d="M7 10v12"/>
+                        <path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z"/>
                     </svg>
                 </span>
             </article>
@@ -104,7 +105,7 @@
                         <label class="dropzone" id="dropzone" for="image-input">
                             <input type="file" id="image-input" accept="image/*" required hidden />
                             <div id="dropzone-text" class="dropzone-text">
-                                <span class="icon">⌁</span>
+                                <span class="icon"><i data-lucide="image"></i></span>
                                 <p><strong>Drop an image here</strong><br />or click to browse your files</p>
                             </div>
                             <img id="image-preview" class="hidden" alt="Selected image preview" />
@@ -134,7 +135,22 @@
                             <input type="range" id="resolution" min="64" max="384" step="64" value="256" />
                         </div>
 
-                        <button type="submit" id="submit-btn">Generate 3D model</button>
+                        <div class="form-group">
+                            <label class="range-label" for="engine_select">
+                                <span>3D Generator Engine</span>
+                            </label>
+                            <select id="engine_select" class="engine-select">
+                                <option value="auto">Auto (Free Local Engine + AI Fallback)</option>
+                                <option value="wonder3d">Wonder3D AI Engine (Single-Image Multi-View)</option>
+                                <option value="local">Free Local Engine (100% Free, Offline)</option>
+                                <option value="tripo">Tripo3D Cloud AI (Requires API Key / Credits)</option>
+                            </select>
+                        </div>
+
+                        <button type="submit" id="submit-btn">
+                            Generate 3D model
+                            <i data-lucide="arrow-up-right" class="btn-icon"></i>
+                        </button>
                     </form>
 
                     <div id="download-group" class="download-group hidden">
@@ -150,14 +166,6 @@
                     <div class="preview-header">
                         <h3 id="viewport-title">Interactive 3D viewport</h3>
                         <span id="status-badge" class="badge">Ready</span>
-                    </div>
-
-                    <div id="detection-bar" class="hidden">
-                        <span id="detection-icon" class="detection-icon">✦</span>
-                        <div class="detection-text">
-                            <span id="detection-label">Detected object</span>
-                            <span id="detection-mode" class="detection-mode-pill"></span>
-                        </div>
                     </div>
 
                     <div id="canvas-container">

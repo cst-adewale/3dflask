@@ -5,3 +5,5 @@ numpy
 opencv-python-headless
 pillow
 python-dotenv
+trimesh
+gradio_client

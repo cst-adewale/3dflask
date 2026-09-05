@@ -47,6 +47,7 @@ function animate() {
 
 document.addEventListener('DOMContentLoaded', () => {
     init3D();
+    if (window.lucide) lucide.createIcons();
 
     const dropzone = document.getElementById('dropzone');
     const fileInput = document.getElementById('image-input');
@@ -114,17 +115,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const loader = document.getElementById('loader');
             const badge = document.getElementById('status-badge');
-            const detectionBar = document.getElementById('detection-bar');
 
             if (loader) loader.classList.remove('hidden');
             if (badge) badge.textContent = 'Generating 3D model...';
-            if (detectionBar) detectionBar.classList.add('hidden');
 
             const formData = new FormData();
             formData.append('image', fileInput.files[0]);
             formData.append('depth_scale', depthScale ? depthScale.value : '0.25');
             formData.append('resolution', resolution ? resolution.value : '256');
-            formData.append('isolate_subject', document.getElementById('isolate_subject').checked);
+            formData.append('isolate_subject', document.getElementById('isolate_subject') ? document.getElementById('isolate_subject').checked : true);
+            const engineSelect = document.getElementById('engine_select');
+            if (engineSelect) formData.append('engine', engineSelect.value);
 
             try {
                 const res = await fetch('/api/convert', { method: 'POST', body: formData });
@@ -139,30 +140,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 if (loader) loader.classList.add('hidden');
-                if (badge) badge.textContent = 'Rendered';
-
-                const CATEGORY_META = {
-                    ball:      { icon: '🏀', label: 'Ball / Sports Sphere', pill: '3D Sphere',      pillClass: 'pill-sphere' },
-                    door:      { icon: '🚪', label: 'Door / Window / Panel', pill: '3D Mesh',        pillClass: 'pill-box' },
-                    cylinder:  { icon: '🍾', label: 'Bottle / Cylinder',    pill: '3D Cylinder',   pillClass: 'pill-cylinder' },
-                    person:    { icon: '🧍', label: 'Person / Human',       pill: '3D Volume',     pillClass: 'pill-depth' },
-                    vehicle:   { icon: '🚗', label: 'Vehicle',              pill: '3D Volume',     pillClass: 'pill-depth' },
-                    furniture: { icon: '🪑', label: 'Furniture',            pill: '3D Volume',     pillClass: 'pill-depth' },
-                    generic:   { icon: '📦', label: 'Generic Object',       pill: '3D Volume',     pillClass: 'pill-depth' },
-                };
-
-                const meta = CATEGORY_META[data.category] || CATEGORY_META.generic;
-                const iconEl = document.getElementById('detection-icon');
-                const labelEl = document.getElementById('detection-label');
-                const modePill = document.getElementById('detection-mode');
-
-                if (iconEl) iconEl.textContent = meta.icon;
-                if (labelEl) labelEl.textContent = `Detected: ${meta.label}`;
-                if (modePill) {
-                    modePill.textContent = meta.pill;
-                    modePill.className = `detection-mode-pill ${meta.pillClass}`;
-                }
-                if (detectionBar) detectionBar.classList.remove('hidden');
+                if (badge) badge.textContent = data.model_label || 'Rendered';
 
                 const dlGlb = document.getElementById('dl-glb');
                 const dlZip = document.getElementById('dl-zip');
