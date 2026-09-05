@@ -225,17 +225,17 @@ class ImageTo3DConverter:
 
             # Step 1: Preprocess image
             processed_img = client.predict(
-                input_image=handle_file(tmp_path),
-                remove_background=True,
-                foreground_ratio=0.85,
+                handle_file(tmp_path),
+                True,
+                0.85,
                 api_name="/preprocess"
             )
             processed_path = processed_img["path"] if isinstance(processed_img, dict) else processed_img
 
             # Step 2: Generate 3D mesh
             result = client.predict(
-                processed_image=handle_file(processed_path),
-                marching_cubes_resolution=256,
+                handle_file(processed_path),
+                256,
                 api_name="/generate"
             )
 
@@ -286,8 +286,8 @@ class ImageTo3DConverter:
             # Step 1: Preprocess (background removal + centering)
             print("[*] InstantMesh step 1/3: preprocessing image...")
             preprocessed = client.predict(
-                input_image=handle_file(tmp_path),
-                do_remove_background=True,
+                handle_file(tmp_path),
+                True,
                 api_name="/preprocess"
             )
             preprocessed_path = preprocessed["path"] if isinstance(preprocessed, dict) else preprocessed
@@ -295,9 +295,9 @@ class ImageTo3DConverter:
             # Step 2: Generate multi-view images
             print("[*] InstantMesh step 2/3: generating multi-view images...")
             client.predict(
-                input_image=handle_file(preprocessed_path),
-                sample_steps=75,
-                sample_seed=42,
+                handle_file(preprocessed_path),
+                75,
+                42,
                 api_name="/generate_mvs"
             )
 
