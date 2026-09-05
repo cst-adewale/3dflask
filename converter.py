@@ -14,7 +14,7 @@ load_dotenv()
 TRIPO_API_KEY = os.getenv("TRIPO_API_KEY")
 TRIPO_API_URL = "https://api.tripo3d.ai/v2/openapi"
 
-def run_with_timeout(func, args=(), kwargs=None, timeout=35):
+def run_with_timeout(func, args=(), kwargs=None, timeout=120):
     if kwargs is None:
         kwargs = {}
     with ThreadPoolExecutor(max_workers=1) as executor:
@@ -220,7 +220,8 @@ class ImageTo3DConverter:
             tmp_path = tmp.name
 
         try:
-            client = Client("stabilityai/TripoSR")
+            token = os.getenv("HF_TOKEN")
+            client = Client("stabilityai/TripoSR", token=token if token and token.strip() else None)
             result = client.predict(
                 image_path=handle_file(tmp_path),
                 do_remove_background=True,
@@ -228,7 +229,18 @@ class ImageTo3DConverter:
                 mc_resolution=256,
                 api_name="/generate_mesh"
             )
-            glb_path = result[0] if isinstance(result, (tuple, list)) else result
+            glb_path = None
+            if isinstance(result, (tuple, list)):
+                for item in result:
+                    if isinstance(item, str) and os.path.exists(item):
+                        glb_path = item
+                        break
+            elif isinstance(result, str) and os.path.exists(result):
+                glb_path = result
+
+            if not glb_path or not os.path.exists(glb_path):
+                raise RuntimeError("Wonder3D did not produce a valid GLB file output.")
+
             with open(glb_path, "rb") as f:
                 return f.read()
         finally:
@@ -253,7 +265,8 @@ class ImageTo3DConverter:
             tmp_path = tmp.name
 
         try:
-            client = Client("TencentARC/InstantMesh")
+            token = os.getenv("HF_TOKEN")
+            client = Client("TencentARC/InstantMesh", token=token if token and token.strip() else None)
 
             # Step 1: Preprocess (background removal + centering)
             print("[*] InstantMesh step 1/3: preprocessing image...")
@@ -277,17 +290,35 @@ class ImageTo3DConverter:
             print("[*] InstantMesh step 3/3: reconstructing 3D mesh...")
             result = client.predict(api_name="/make3d")
 
-            # result is (obj_path, glb_path)
-            glb_path = result[1] if isinstance(result, (list, tuple)) and len(result) > 1 else result[0]
+            glb_path = None
+            if isinstance(result, (list, tuple)):
+                for item in reversed(result):
+                    if isinstance(item, str) and os.path.exists(item):
+                        glb_path = item
+                        break
+                    elif isinstance(item, dict) and (item.get("path") or item.get("name")):
+                        p = item.get("path") or item.get("name")
+                        if p and os.path.exists(p):
+                            glb_path = p
+                            break
+            elif isinstance(result, str) and os.path.exists(result):
+                glb_path = result
+            elif isinstance(result, dict):
+                p = result.get("path") or result.get("name")
+                if p and os.path.exists(p):
+                    glb_path = p
+
+            if not glb_path or not os.path.exists(glb_path):
+                raise RuntimeError("InstantMesh did not produce a valid GLB file output.")
+
             with open(glb_path, "rb") as f:
                 return f.read()
         finally:
-            for p in [tmp_path]:
-                if os.path.exists(p):
-                    try:
-                        os.remove(p)
-                    except Exception:
-                        pass
+            if os.path.exists(tmp_path):
+                try:
+                    os.remove(tmp_path)
+                except Exception:
+                    pass
 
     def convert(
         self,
@@ -310,7 +341,7 @@ class ImageTo3DConverter:
             strategy_label = "Local Heightmap Extrusion"
         elif engine == "instantmesh":
             try:
-                glb_bytes = run_with_timeout(self._generate_instantmesh, args=(image_bytes,), timeout=30)
+                glb_bytes = run_with_timeout(self._generate_instantmesh, args=(image_bytes,), timeout=120)
                 used_engine = "InstantMesh AI Engine"
                 strategy_label = "InstantMesh Multi-View Mesh"
             except Exception as err:
@@ -320,7 +351,7 @@ class ImageTo3DConverter:
                 strategy_label = "Local Heightmap Extrusion"
         elif engine == "wonder3d":
             try:
-                glb_bytes = run_with_timeout(self._generate_wonder3d, args=(image_bytes,), timeout=30)
+                glb_bytes = run_with_timeout(self._generate_wonder3d, args=(image_bytes,), timeout=120)
                 used_engine = "Wonder3D AI Engine"
                 strategy_label = "Wonder3D Multi-View Mesh"
             except Exception as err:
@@ -331,7 +362,7 @@ class ImageTo3DConverter:
         elif engine == "tripo":
             if TRIPO_API_KEY and TRIPO_API_KEY.strip():
                 try:
-                    glb_bytes = run_with_timeout(self._generate_tripo3d, args=(image_bytes,), timeout=30)
+                    glb_bytes = run_with_timeout(self._generate_tripo3d, args=(image_bytes,), timeout=120)
                     used_engine = "Tripo3D Cloud AI"
                     strategy_label = "Generative 3D (Tripo3D)"
                 except Exception as err:
@@ -346,7 +377,7 @@ class ImageTo3DConverter:
         else:  # auto — strongest to weakest cascade: Tripo3D -> InstantMesh -> Wonder3D -> Free Local
             if TRIPO_API_KEY and TRIPO_API_KEY.strip():
                 try:
-                    glb_bytes = run_with_timeout(self._generate_tripo3d, args=(image_bytes,), timeout=30)
+                    glb_bytes = run_with_timeout(self._generate_tripo3d, args=(image_bytes,), timeout=120)
                     used_engine = "Tripo3D Cloud AI"
                     strategy_label = "Generative 3D (Tripo3D)"
                 except Exception:
@@ -354,12 +385,12 @@ class ImageTo3DConverter:
 
             if not glb_bytes:
                 try:
-                    glb_bytes = run_with_timeout(self._generate_instantmesh, args=(image_bytes,), timeout=25)
+                    glb_bytes = run_with_timeout(self._generate_instantmesh, args=(image_bytes,), timeout=120)
                     used_engine = "InstantMesh AI Engine"
                     strategy_label = "InstantMesh Multi-View Mesh"
                 except Exception:
                     try:
-                        glb_bytes = run_with_timeout(self._generate_wonder3d, args=(image_bytes,), timeout=25)
+                        glb_bytes = run_with_timeout(self._generate_wonder3d, args=(image_bytes,), timeout=120)
                         used_engine = "Wonder3D AI Engine"
                         strategy_label = "Wonder3D Multi-View Mesh"
                     except Exception:

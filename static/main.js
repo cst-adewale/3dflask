@@ -134,7 +134,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
             try {
                 const res = await fetch('/api/convert', { method: 'POST', body: formData });
-                const data = await res.json();
+                let data;
+                try {
+                    data = await res.json();
+                } catch (jsonErr) {
+                    data = { status: 'error', message: 'Server processing note (Status ' + res.status + '). Please try again or switch to Auto / v0 pri.' };
+                }
 
                 if (!res.ok || data.status === 'error') {
                     const msg = data.message || 'Generation failed. Please try again.';
@@ -194,6 +199,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (loader) loader.classList.add('hidden');
                 if (badge) badge.textContent = 'Error';
                 console.error('Conversion failed:', err);
+                alert('Connection error: ' + (err.message || 'Unable to connect to server. Please check your internet connection and try again.'));
             }
         });
     }
