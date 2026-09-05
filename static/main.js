@@ -18,6 +18,11 @@ function init3D() {
     controls.enableDamping = true;
     controls.enableZoom = false;
 
+    // Disable touch/pointer events on canvas until a 3D model is loaded
+    // so mobile users can scroll the page freely through the empty viewport
+    renderer.domElement.style.pointerEvents = 'none';
+    renderer.domElement.style.touchAction = 'auto';
+
     const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 1.2);
     scene.add(hemiLight);
 
@@ -175,6 +180,12 @@ document.addEventListener('DOMContentLoaded', () => {
                         controls.target.set(0, 0, 0);
                         controls.enableZoom = true;
                         controls.update();
+                    }
+
+                    // Re-enable pointer/touch events now that a model is present
+                    if (renderer) {
+                        renderer.domElement.style.pointerEvents = 'auto';
+                        renderer.domElement.style.touchAction = 'none';
                     }
 
                     scene.add(currentMesh);

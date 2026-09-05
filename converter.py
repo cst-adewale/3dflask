@@ -229,6 +229,57 @@ class ImageTo3DConverter:
                 except Exception:
                     pass
 
+    def _generate_instantmesh(self, image_bytes: bytes) -> bytes:
+        """
+        Generates a high-quality 3D GLB using InstantMesh (TencentARC) via HuggingFace Gradio.
+        3-step pipeline: preprocess -> generate_mvs -> make3d
+        """
+        import tempfile
+        from gradio_client import Client, handle_file
+
+        print("[*] Sending image to InstantMesh AI Engine (TencentARC)...")
+
+        with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
+            tmp.write(image_bytes)
+            tmp_path = tmp.name
+
+        try:
+            client = Client("TencentARC/InstantMesh")
+
+            # Step 1: Preprocess (background removal + centering)
+            print("[*] InstantMesh step 1/3: preprocessing image...")
+            preprocessed = client.predict(
+                input_image=handle_file(tmp_path),
+                do_remove_background=True,
+                api_name="/preprocess"
+            )
+            preprocessed_path = preprocessed["path"] if isinstance(preprocessed, dict) else preprocessed
+
+            # Step 2: Generate multi-view images
+            print("[*] InstantMesh step 2/3: generating multi-view images...")
+            client.predict(
+                input_image=handle_file(preprocessed_path),
+                sample_steps=75,
+                sample_seed=42,
+                api_name="/generate_mvs"
+            )
+
+            # Step 3: Reconstruct 3D mesh from multi-views
+            print("[*] InstantMesh step 3/3: reconstructing 3D mesh...")
+            result = client.predict(api_name="/make3d")
+
+            # result is (obj_path, glb_path)
+            glb_path = result[1] if isinstance(result, (list, tuple)) and len(result) > 1 else result[0]
+            with open(glb_path, "rb") as f:
+                return f.read()
+        finally:
+            for p in [tmp_path]:
+                if os.path.exists(p):
+                    try:
+                        os.remove(p)
+                    except Exception:
+                        pass
+
     def convert(
         self,
         image_bytes: bytes,
@@ -248,6 +299,16 @@ class ImageTo3DConverter:
             glb_bytes = self.generate_local_3d(image_bytes, depth_scale, res)
             used_engine = "Local 3D Engine (Free)"
             strategy_label = "Local Heightmap Extrusion"
+        elif engine == "instantmesh":
+            try:
+                glb_bytes = self._generate_instantmesh(image_bytes)
+                used_engine = "InstantMesh AI Engine"
+                strategy_label = "InstantMesh Multi-View Mesh"
+            except Exception as err:
+                print(f"[!] InstantMesh note ({err}). Using Free Local Engine.")
+                glb_bytes = self.generate_local_3d(image_bytes, depth_scale, res)
+                used_engine = "InstantMesh (Local Fallback)"
+                strategy_label = "Local Heightmap Extrusion"
         elif engine == "wonder3d":
             try:
                 glb_bytes = self._generate_wonder3d(image_bytes)
@@ -273,7 +334,7 @@ class ImageTo3DConverter:
                 glb_bytes = self.generate_local_3d(image_bytes, depth_scale, res)
                 used_engine = "Local 3D Engine (Free)"
                 strategy_label = "Local Heightmap Extrusion"
-        else:  # auto
+        else:  # auto — try InstantMesh first (free + high quality), then local
             if TRIPO_API_KEY and TRIPO_API_KEY.strip():
                 try:
                     glb_bytes = self._generate_tripo3d(image_bytes)
@@ -285,13 +346,18 @@ class ImageTo3DConverter:
                     strategy_label = "Local Heightmap Extrusion"
             else:
                 try:
-                    glb_bytes = self._generate_wonder3d(image_bytes)
-                    used_engine = "Wonder3D AI Engine"
-                    strategy_label = "Wonder3D Multi-View Mesh"
+                    glb_bytes = self._generate_instantmesh(image_bytes)
+                    used_engine = "InstantMesh AI Engine"
+                    strategy_label = "InstantMesh Multi-View Mesh"
                 except Exception:
-                    glb_bytes = self.generate_local_3d(image_bytes, depth_scale, res)
-                    used_engine = "Local 3D Engine (Free)"
-                    strategy_label = "Local Heightmap Extrusion"
+                    try:
+                        glb_bytes = self._generate_wonder3d(image_bytes)
+                        used_engine = "Wonder3D AI Engine"
+                        strategy_label = "Wonder3D Multi-View Mesh"
+                    except Exception:
+                        glb_bytes = self.generate_local_3d(image_bytes, depth_scale, res)
+                        used_engine = "Local 3D Engine (Free)"
+                        strategy_label = "Local Heightmap Extrusion"
 
         # OpenCV depth-map visualization
         gray = cv2.cvtColor(np.array(raw_img.convert("RGB")), cv2.COLOR_RGB2GRAY)

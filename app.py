@@ -2,6 +2,9 @@ import os
 import io
 import base64
 import cv2
+import threading
+import time
+import requests
 from flask import Flask, render_template, request, send_file, jsonify
 from converter import ImageTo3DConverter
 
@@ -11,9 +14,41 @@ converter = ImageTo3DConverter()
 # Cache generated files in memory for fast retrieval
 CACHE = {}
 
+def start_self_pinger():
+    def ping_loop():
+        time.sleep(15)  # Initial grace period on startup
+        while True:
+            try:
+                # Render provides RENDER_EXTERNAL_URL automatically, or use custom SELF_PING_URL / local fallback
+                base_url = os.getenv("RENDER_EXTERNAL_URL") or os.getenv("SELF_PING_URL")
+                if base_url:
+                    ping_url = f"{base_url.rstrip('/')}/ping"
+                    res = requests.get(ping_url, timeout=15)
+                    print(f"[*] [KeepAlive Pinger] Pinged {ping_url} -> Status {res.status_code}")
+                else:
+                    port = int(os.environ.get('PORT', 5000))
+                    ping_url = f"http://127.0.0.1:{port}/ping"
+                    res = requests.get(ping_url, timeout=15)
+                    print(f"[*] [KeepAlive Pinger] Local Ping -> Status {res.status_code}")
+            except Exception as err:
+                print(f"[*] [KeepAlive Pinger] Ping note: {err}")
+            
+            # Ping every 14 minutes (840 seconds) to prevent Render free tier sleep (15 min limit)
+            time.sleep(14 * 60)
+
+    pinger_thread = threading.Thread(target=ping_loop, daemon=True)
+    pinger_thread.start()
+
+# Start background pinger daemon
+start_self_pinger()
+
 @app.route('/')
 def index():
     return render_template('index.html')
+
+@app.route('/ping')
+def ping():
+    return jsonify({'status': 'alive', 'message': 'Keep-alive ping successful'}), 200
 
 @app.route('/favicon.ico')
 def favicon():
