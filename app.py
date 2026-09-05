@@ -74,6 +74,7 @@ def convert():
             'message': error_msg
         }), 400
 
+    CACHE.clear()
     CACHE['model.glb'] = glb_bytes
     CACHE['model.zip'] = zip_bytes
 
