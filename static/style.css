@@ -683,7 +683,8 @@ input[type="range"] {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 16px;
-    padding: 26px 0 90px;
+    padding-top: 26px;
+    padding-bottom: 90px;
     border-top: 1px solid var(--line);
 }
 
