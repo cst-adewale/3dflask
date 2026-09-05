@@ -222,19 +222,34 @@ class ImageTo3DConverter:
         try:
             token = os.getenv("HF_TOKEN")
             client = Client("stabilityai/TripoSR", token=token if token and token.strip() else None)
-            result = client.predict(
-                image_path=handle_file(tmp_path),
-                do_remove_background=True,
+
+            # Step 1: Preprocess image
+            processed_img = client.predict(
+                input_image=handle_file(tmp_path),
+                remove_background=True,
                 foreground_ratio=0.85,
-                mc_resolution=256,
-                api_name="/generate_mesh"
+                api_name="/preprocess"
             )
+            processed_path = processed_img["path"] if isinstance(processed_img, dict) else processed_img
+
+            # Step 2: Generate 3D mesh
+            result = client.predict(
+                processed_image=handle_file(processed_path),
+                marching_cubes_resolution=256,
+                api_name="/generate"
+            )
+
             glb_path = None
             if isinstance(result, (tuple, list)):
-                for item in result:
+                for item in reversed(result):
                     if isinstance(item, str) and os.path.exists(item):
                         glb_path = item
                         break
+                    elif isinstance(item, dict) and (item.get("path") or item.get("name")):
+                        p = item.get("path") or item.get("name")
+                        if p and os.path.exists(p):
+                            glb_path = p
+                            break
             elif isinstance(result, str) and os.path.exists(result):
                 glb_path = result
 
