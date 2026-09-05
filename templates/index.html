@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Semantic Image to 3D Converter</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Image to 3D Mesh Generator</h1>
+            <p>Powered by <strong>Depth-Anything V2</strong> &amp; <strong>CLIP</strong> Semantic Classification &rarr; Smart 3D Geometry</p>
+        </header>
+
+        <main class="grid">
+            <!-- Sidebar Controls -->
+            <section class="card controls">
+                <h2>Conversion Options</h2>
+                <form id="convert-form">
+                    <div class="dropzone" id="dropzone">
+                        <input type="file" id="image-input" accept="image/*" required hidden>
+                        <div id="dropzone-text">
+                            <span class="icon">📷</span>
+                            <p>Drag & drop or <strong>click to upload</strong></p>
+                        </div>
+                        <img id="image-preview" class="hidden">
+                    </div>
+
+                    <div class="form-group checkbox-group">
+                        <label for="isolate_subject">
+                            <input type="checkbox" id="isolate_subject" checked>
+                            Auto-Isolate Main Subject (Remove Background)
+                        </label>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="depth_scale">Depth Extrusion Scale: <span id="scale-val">0.25</span></label>
+                        <input type="range" id="depth_scale" min="0.05" max="0.8" step="0.05" value="0.25">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="resolution">Mesh Resolution: <span id="res-val">256</span></label>
+                        <input type="range" id="resolution" min="64" max="384" step="64" value="256">
+                    </div>
+
+                    <button type="submit" id="submit-btn">Generate 3D Model</button>
+                </form>
+
+                <div id="download-group" class="hidden">
+                    <h3>Download 3D Assets</h3>
+                    <div class="btn-group">
+                        <a id="dl-glb" class="btn primary" download>Download GLB (Blender)</a>
+                        <a id="dl-zip" class="btn secondary" download>Download OBJ + Textures (.zip)</a>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Display & 3D Viewport -->
+            <section class="card viewport-container">
+                <div class="preview-header">
+                    <h2>Interactive 3D Viewport</h2>
+                    <span id="status-badge" class="badge">Ready</span>
+                </div>
+
+                <!-- Detection result banner -->
+                <div id="detection-bar" class="detection-bar hidden">
+                    <span id="detection-icon" class="detection-icon"></span>
+                    <div class="detection-text">
+                        <span id="detection-label">Detected object</span>
+                        <span id="detection-mode" class="detection-mode-pill"></span>
+                    </div>
+                </div>
+
+                <div id="canvas-container">
+                    <div id="loader" class="hidden"><div class="spinner"></div><p>Classifying object &amp; generating 3D model…</p></div>
+                </div>
+
+                <div class="depth-preview-bar">
+                    <h3>Depth-Anything V2 Depth Map</h3>
+                    <img id="depth-preview" alt="Depth Map Output">
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="/static/main.js"></script>
+</body>
+</html>

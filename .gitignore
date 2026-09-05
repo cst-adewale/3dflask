@@ -1,0 +1,13 @@
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.DS_Store
+*.glb
+*.obj
+*.mtl
+*.zip
+*.log
