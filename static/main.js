@@ -16,6 +16,7 @@ function init3D() {
 
     controls = new THREE.OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
+    controls.enableZoom = false;
 
     const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 1.2);
     scene.add(hemiLight);
@@ -194,6 +195,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     camera.lookAt(0, 0, 0);
                     if (controls) {
                         controls.target.set(0, 0, 0);
+                        controls.enableZoom = true;
                         controls.update();
                     }
 
