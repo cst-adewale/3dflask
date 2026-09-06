@@ -155,10 +155,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 const dlGlb = document.getElementById('dl-glb');
                 const dlZip = document.getElementById('dl-zip');
                 const dlGroup = document.getElementById('download-group');
-                if (dlGlb) dlGlb.href = data.glb_url;
+                // Download button uses the server endpoint, not the data URI
+                if (dlGlb) dlGlb.href = '/api/download/model.glb';
                 if (dlZip) dlZip.href = data.zip_url;
                 if (dlGroup) dlGroup.classList.remove('hidden');
 
+                // Three.js viewer loads directly from the embedded base64 data URI
                 const gltfLoader = new THREE.GLTFLoader();
                 gltfLoader.load(data.glb_url, (gltf) => {
                     if (currentMesh) scene.remove(currentMesh);

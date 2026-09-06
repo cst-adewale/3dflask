@@ -78,13 +78,26 @@ def convert():
     CACHE['model.glb'] = glb_bytes
     CACHE['model.zip'] = zip_bytes
 
+    # Also write to /tmp so download endpoint works across threads/restarts
+    try:
+        with open('/tmp/model.glb', 'wb') as f:
+            f.write(glb_bytes)
+        with open('/tmp/model.zip', 'wb') as f:
+            f.write(zip_bytes)
+    except Exception:
+        pass
+
     _, depth_encoded = cv2.imencode('.png', (depth_map * 255).astype('uint8'))
     depth_b64 = base64.b64encode(depth_encoded).decode('utf-8')
+
+    # Embed GLB as a base64 data URI so the 3D viewer never needs a second request
+    glb_b64 = base64.b64encode(glb_bytes).decode('utf-8')
+    glb_data_uri = f'data:model/gltf-binary;base64,{glb_b64}'
 
     return jsonify({
         'status': 'success',
         'depth_map': f'data:image/png;base64,{depth_b64}',
-        'glb_url': '/api/download/model.glb',
+        'glb_url': glb_data_uri,
         'zip_url': '/api/download/model.zip',
         'category': category,
         'strategy': strategy,
@@ -93,16 +106,29 @@ def convert():
 
 @app.route('/api/download/<filename>')
 def download(filename):
-    if filename not in CACHE:
-        return 'File not found', 404
-    
-    mimetype = 'model/gltf-binary' if filename.endswith('.glb') else 'application/zip'
-    return send_file(
-        io.BytesIO(CACHE[filename]),
-        mimetype=mimetype,
-        as_attachment=True,
-        download_name=filename
-    )
+    # Try in-memory cache first
+    if filename in CACHE:
+        mimetype = 'model/gltf-binary' if filename.endswith('.glb') else 'application/zip'
+        return send_file(
+            io.BytesIO(CACHE[filename]),
+            mimetype=mimetype,
+            as_attachment=True,
+            download_name=filename
+        )
+    # Fallback: serve from /tmp if cache was cleared
+    tmp_path = f'/tmp/{filename}'
+    try:
+        if os.path.exists(tmp_path):
+            mimetype = 'model/gltf-binary' if filename.endswith('.glb') else 'application/zip'
+            return send_file(
+                tmp_path,
+                mimetype=mimetype,
+                as_attachment=True,
+                download_name=filename
+            )
+    except Exception:
+        pass
+    return jsonify({'error': 'File not found. Please regenerate your model.'}), 404
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
