@@ -17,9 +17,13 @@ TRIPO_API_URL = "https://api.tripo3d.ai/v2/openapi"
 def run_with_timeout(func, args=(), kwargs=None, timeout=120):
     if kwargs is None:
         kwargs = {}
-    with ThreadPoolExecutor(max_workers=1) as executor:
+    executor = ThreadPoolExecutor(max_workers=1)
+    try:
         future = executor.submit(func, *args, **kwargs)
         return future.result(timeout=timeout)
+    finally:
+        # Do not wait for a slow remote provider after the request timeout.
+        executor.shutdown(wait=False, cancel_futures=True)
 
 
 
@@ -356,7 +360,7 @@ class ImageTo3DConverter:
             strategy_label = "Local Heightmap Extrusion"
         elif engine == "instantmesh":
             try:
-                glb_bytes = run_with_timeout(self._generate_instantmesh, args=(image_bytes,), timeout=120)
+                glb_bytes = run_with_timeout(self._generate_instantmesh, args=(image_bytes,), timeout=85)
                 used_engine = "InstantMesh AI Engine"
                 strategy_label = "InstantMesh Multi-View Mesh"
             except Exception as err:
@@ -366,7 +370,7 @@ class ImageTo3DConverter:
                 strategy_label = "Local Heightmap Extrusion"
         elif engine == "wonder3d":
             try:
-                glb_bytes = run_with_timeout(self._generate_wonder3d, args=(image_bytes,), timeout=120)
+                glb_bytes = run_with_timeout(self._generate_wonder3d, args=(image_bytes,), timeout=85)
                 used_engine = "Wonder3D AI Engine"
                 strategy_label = "Wonder3D Multi-View Mesh"
             except Exception as err:
@@ -377,7 +381,7 @@ class ImageTo3DConverter:
         elif engine == "tripo":
             if TRIPO_API_KEY and TRIPO_API_KEY.strip():
                 try:
-                    glb_bytes = run_with_timeout(self._generate_tripo3d, args=(image_bytes,), timeout=120)
+                    glb_bytes = run_with_timeout(self._generate_tripo3d, args=(image_bytes,), timeout=85)
                     used_engine = "Tripo3D Cloud AI"
                     strategy_label = "Generative 3D (Tripo3D)"
                 except Exception as err:
@@ -392,7 +396,7 @@ class ImageTo3DConverter:
         else:  # auto — strongest to weakest cascade: Tripo3D -> InstantMesh -> Wonder3D -> Free Local
             if TRIPO_API_KEY and TRIPO_API_KEY.strip():
                 try:
-                    glb_bytes = run_with_timeout(self._generate_tripo3d, args=(image_bytes,), timeout=120)
+                    glb_bytes = run_with_timeout(self._generate_tripo3d, args=(image_bytes,), timeout=85)
                     used_engine = "Tripo3D Cloud AI"
                     strategy_label = "Generative 3D (Tripo3D)"
                 except Exception:
@@ -400,12 +404,12 @@ class ImageTo3DConverter:
 
             if not glb_bytes:
                 try:
-                    glb_bytes = run_with_timeout(self._generate_instantmesh, args=(image_bytes,), timeout=120)
+                    glb_bytes = run_with_timeout(self._generate_instantmesh, args=(image_bytes,), timeout=85)
                     used_engine = "InstantMesh AI Engine"
                     strategy_label = "InstantMesh Multi-View Mesh"
                 except Exception:
                     try:
-                        glb_bytes = run_with_timeout(self._generate_wonder3d, args=(image_bytes,), timeout=120)
+                        glb_bytes = run_with_timeout(self._generate_wonder3d, args=(image_bytes,), timeout=85)
                         used_engine = "Wonder3D AI Engine"
                         strategy_label = "Wonder3D Multi-View Mesh"
                     except Exception:
@@ -445,4 +449,3 @@ class ImageTo3DConverter:
                 print(f"OBJ export fallback note: {e}")
 
         return glb_bytes, zip_buf.getvalue(), depth_map, category, strategy_label, used_engine
-
