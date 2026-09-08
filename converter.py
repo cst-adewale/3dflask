@@ -13,6 +13,8 @@ load_dotenv()
 
 TRIPO_API_KEY = os.getenv("TRIPO_API_KEY")
 TRIPO_API_URL = "https://api.tripo3d.ai/v2/openapi"
+RODIN_API_KEY = os.getenv("RODIN_API_KEY")
+RODIN_API_URL = "https://api.hyper3d.com/api/v2"
 
 def run_with_timeout(func, args=(), kwargs=None, timeout=120):
     if kwargs is None:
@@ -148,6 +150,76 @@ class ImageTo3DConverter:
                 raise RuntimeError("Tripo3D task generation failed on server side.")
 
         raise RuntimeError("Tripo3D generation timed out.")
+
+    def _generate_rodin(self, image_bytes: bytes) -> bytes:
+        """Generate a high-quality textured GLB with Rodin Gen-2.5."""
+        if not RODIN_API_KEY or not RODIN_API_KEY.strip():
+            raise RuntimeError("RODIN_API_KEY environment variable is not configured.")
+
+        headers = {"Authorization": f"Bearer {RODIN_API_KEY}"}
+        response = requests.post(
+            f"{RODIN_API_URL}/rodin",
+            headers=headers,
+            files={"images": ("image.png", image_bytes, "image/png")},
+            data={
+                "tier": os.getenv("RODIN_TIER", "Gen-2.5-High"),
+                "geometry_instruct_mode": "faithful",
+                "mesh_mode": "Raw",
+                "quality": "high",
+                "geometry_file_format": "glb",
+                "material": "PBR",
+                "texture_mode": "high",
+                "detail_level": "3",
+            },
+            timeout=30,
+        )
+        if response.status_code not in (200, 201):
+            raise RuntimeError(f"Rodin submission failed ({response.status_code}): {response.text[:500]}")
+
+        submission = response.json()
+        task_uuid = submission.get("uuid")
+        subscription_key = submission.get("jobs", {}).get("subscription_key")
+        if not task_uuid or not subscription_key:
+            raise RuntimeError("Rodin did not return task identifiers.")
+
+        deadline = time.time() + 75
+        while time.time() < deadline:
+            time.sleep(5)
+            status_response = requests.post(
+                f"{RODIN_API_URL}/status",
+                headers={**headers, "Content-Type": "application/json"},
+                json={"subscription_key": subscription_key},
+                timeout=30,
+            )
+            if status_response.status_code not in (200, 201):
+                continue
+
+            jobs = status_response.json().get("jobs", [])
+            if any(job.get("status") == "Failed" for job in jobs):
+                raise RuntimeError("Rodin generation failed on the provider side.")
+            if jobs and all(job.get("status") == "Done" for job in jobs):
+                break
+        else:
+            raise RuntimeError("Rodin generation timed out.")
+
+        download_response = requests.post(
+            f"{RODIN_API_URL}/download",
+            headers={**headers, "Content-Type": "application/json"},
+            json={"task_uuid": task_uuid},
+            timeout=30,
+        )
+        if download_response.status_code not in (200, 201):
+            raise RuntimeError(f"Rodin download failed ({download_response.status_code}): {download_response.text[:500]}")
+
+        files = download_response.json().get("list", [])
+        model_file = next((item for item in files if item.get("name", "").lower().endswith(".glb")), None)
+        if not model_file or not model_file.get("url"):
+            raise RuntimeError("Rodin did not return a GLB download URL.")
+
+        model_response = requests.get(model_file["url"], timeout=60)
+        if model_response.status_code != 200:
+            raise RuntimeError(f"Rodin model download failed ({model_response.status_code}).")
+        return model_response.content
 
     def generate_local_3d(self, image_bytes: bytes, depth_scale: float = 0.25, res: int = 256) -> bytes:
         """
@@ -393,8 +465,26 @@ class ImageTo3DConverter:
                 glb_bytes = self.generate_local_3d(image_bytes, depth_scale, res)
                 used_engine = "Local 3D Engine (Free)"
                 strategy_label = "Local Heightmap Extrusion"
+        elif engine == "rodin":
+            try:
+                glb_bytes = run_with_timeout(self._generate_rodin, args=(image_bytes,), timeout=85)
+                used_engine = "Rodin Gen-2.5 Cloud AI"
+                strategy_label = "Faithful High-Detail Mesh"
+            except Exception as err:
+                print(f"[!] Rodin unavailable ({err}). Falling back to Free Local Engine.")
+                glb_bytes = self.generate_local_3d(image_bytes, depth_scale, res)
+                used_engine = "Rodin (Local Fallback)"
+                strategy_label = "Local Heightmap Extrusion"
         else:  # auto — strongest to weakest cascade: Tripo3D -> InstantMesh -> Wonder3D -> Free Local
-            if TRIPO_API_KEY and TRIPO_API_KEY.strip():
+            if RODIN_API_KEY and RODIN_API_KEY.strip():
+                try:
+                    glb_bytes = run_with_timeout(self._generate_rodin, args=(image_bytes,), timeout=85)
+                    used_engine = "Rodin Gen-2.5 Cloud AI"
+                    strategy_label = "Faithful High-Detail Mesh"
+                except Exception:
+                    pass
+
+            if not glb_bytes and TRIPO_API_KEY and TRIPO_API_KEY.strip():
                 try:
                     glb_bytes = run_with_timeout(self._generate_tripo3d, args=(image_bytes,), timeout=85)
                     used_engine = "Tripo3D Cloud AI"

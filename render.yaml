@@ -10,5 +10,7 @@ services:
         value: 3.11.6
       - key: TRIPO_API_KEY
         sync: false
+      - key: RODIN_API_KEY
+        sync: false
       - key: HF_TOKEN
         sync: false
